@@ -1,4 +1,5 @@
 const pool = require('../config/db');
+const logger = require('../utils/logger');
 
 // Service para manejar la lógica de reservas
 class ReservationService {
@@ -32,6 +33,7 @@ class ReservationService {
         // Si ya existe una reserva con la misma llave, retornar la reserva existente
         if (existingRes.rows.length > 0) {
           await client.query('COMMIT');
+          logger.info('RESERVATION_IDEMPOTENT_HIT', { idempotencyKey, reservationId: existingRes.rows[0].id });
           return { reservation: existingRes.rows[0], idempotentHit: true };
         }
       }
@@ -43,6 +45,7 @@ class ReservationService {
       );
 
       if (productRes.rows.length === 0) {
+        logger.error('RESERVATION_REJECTED', new Error('PRODUCT_NOT_FOUND'), { productId, quantity, idempotencyKey });
         throw new Error('PRODUCT_NOT_FOUND');
       }
 
@@ -50,6 +53,7 @@ class ReservationService {
 
       // 3. Validar inventario suficiente
       if (product.available_stock < quantity) {
+        logger.error('RESERVATION_REJECTED', new Error('INSUFFICIENT_STOCK'), { productId, quantity, idempotencyKey });
         throw new Error('INSUFFICIENT_STOCK');
       }
 
@@ -68,6 +72,7 @@ class ReservationService {
       );
     // commit de la transaccion si todo fue exitosos y en caso de error hacer rollback para mantener la consistencia de la base de datos
       await client.query('COMMIT');
+      logger.info('RESERVATION_ACCEPTED', { reservationId: insertRes.rows[0].id, productId, quantity, idempotencyKey });
       return { reservation: insertRes.rows[0], idempotentHit: false };
     } catch (error) {
       await client.query('ROLLBACK');
@@ -91,6 +96,7 @@ class ReservationService {
       );
 
       if (resQuery.rows.length === 0) {
+        logger.error('CANCELLATION_FAILED', new Error('RESERVATION_NOT_FOUND'), { reservationId });
         throw new Error('RESERVATION_NOT_FOUND');
       }
 
@@ -99,6 +105,7 @@ class ReservationService {
       // Si ya está cancelada, mantener estado consistente sin re-sumar stock (idempotencia en cancelación)
       if (reservation.status === 'CANCELLED') {
         await client.query('COMMIT');
+        logger.info('CANCELLATION_ALREADY_PROCESSED', { reservationId });
         return { message: 'La reserva ya se encontraba cancelada.', reservation };
       }
 
@@ -115,6 +122,7 @@ class ReservationService {
       );
       // commit de la transaccion si todo fue exitosos y en caso de error hacer rollback para mantener la consistencia de la base de datos
       await client.query('COMMIT');
+      logger.info('RESERVATION_CANCELLED', { reservationId, restoredStock: reservation.quantity, productId: reservation.product_id });
       return { message: 'Reserva cancelada exitosamente y stock devuelto.' };
     } catch (error) {
       await client.query('ROLLBACK');
