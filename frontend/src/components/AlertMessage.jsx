@@ -1,24 +1,22 @@
 import React from 'react';
+import '../css/AlertMessage.css'; 
 
-export default function AlertMessage({ message, type }) {
+// Componente AlertMessage
+// Muestra mensajes de alerta al usuario, diferenciando entre errores y éxitos.
+// Se puede reutilizar en diferentes partes de la aplicación para notificaciones consistentes.
+export default function AlertMessage({ message, type = 'error' }) {
   if (!message) return null;
-
+// Determina si el mensaje es de éxito o error para aplicar estilos y iconografía adecuada
   const isSuccess = type === 'success';
-  const bgColor = isSuccess ? '#d4edda' : '#f8d7da';
-  const textColor = isSuccess ? '#155724' : '#721c24';
-  const borderColor = isSuccess ? '#c3e6cb' : '#f5c6cb';
-
+// Renderiza el mensaje de alerta con estilos y contenido dinámico según el tipo
   return (
-    <div style={{
-      padding: '12px 16px',
-      marginBottom: '1.5rem',
-      borderRadius: '6px',
-      backgroundColor: bgColor,
-      color: textColor,
-      border: `1px solid ${borderColor}`,
-      fontSize: '0.95rem'
-    }}>
-      {message}
+    <div className={`alert-message ${isSuccess ? 'alert-success' : 'alert-error'}`}>
+      <span className="alert-icon">
+        {isSuccess ? '✓' : '⚠️'}
+      </span>
+      <div className="alert-content">
+        {message}
+      </div>
     </div>
   );
 }

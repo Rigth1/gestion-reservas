@@ -44,4 +44,5 @@ services:
     restart: always
 
 volumes:
+# Volumen para persistir los datos de PostgreSQL entre reinicios del contenedor
   postgres_data:

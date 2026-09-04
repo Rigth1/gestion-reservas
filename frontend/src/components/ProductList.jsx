@@ -1,49 +1,82 @@
 import React, { useState } from 'react';
+import '../css/ProductList.css'; // Importación de estilos independientes
 
+/**
+ * Componente ProductList
+ * Muestra el catálogo de productos disponibles en tarjetas en formato de cuadrícula,
+ * permitiendo al usuario ingresar la cantidad deseada y enviar la solicitud de reserva.
+ */
 export default function ProductList({ products, onReserve, loading }) {
+  // Estado local para almacenar dinámicamente la cantidad escrita por cada producto (keyed por product.id)
   const [quantities, setQuantities] = useState({});
 
+  // Maneja el cambio de valor en el input de cantidad para un producto específico
   const handleInputChange = (productId, value) => {
     setQuantities({ ...quantities, [productId]: value });
   };
 
+  // Dispara la acción de reserva enviando el ID del producto y la cantidad seleccionada
   const handleAction = (productId) => {
     const qty = quantities[productId];
     onReserve(productId, qty);
   };
 
+  // Pantalla de carga inicial si aún no hay productos en memoria
   if (loading && products.length === 0) {
-    return <p>Cargando productos...</p>;
+    return (
+      <div className="product-loading-container">
+        <div className="spinner"></div>
+        <p>Cargando catálogo de productos...</p>
+      </div>
+    );
   }
 
   return (
-    <section style={{ marginBottom: '2.5rem' }}>
-      <h2 style={{ color: '#333', marginBottom: '1rem' }}>Productos Disponibles</h2>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem' }}>
+    <section className="product-section">
+      <h2 className="section-title">Productos Disponibles</h2>
+      
+      {/* Cuadrícula de tarjetas de productos */}
+      <div className="product-grid">
         {products.map((product) => {
+          // Soporta distintas nomenclaturas de propiedades que pueda enviar el backend
           const available = product.available_stock !== undefined ? product.available_stock : product.cantidad_actual;
           const initial = product.initial_stock || product.cantidad_inicial;
-
+          const isOutOfStock = available <= 0;
+        // Renderiza cada tarjeta de producto con su información y controles de acción
           return (
-            <div key={product.id} style={{ border: '1px solid #ddd', borderRadius: '8px', padding: '1.2rem', background: '#fff', boxShadow: '0 2px 4px rgba(0,0,0,0.05)' }}>
-              <h3 style={{ margin: '0 0 8px 0', color: '#333' }}>{product.name}</h3>
-              <p style={{ margin: '4px 0', color: '#666', fontSize: '0.9rem' }}>Inventario Inicial: <strong>{initial}</strong></p>
-              <p style={{ margin: '4px 0 12px 0', color: '#27ae60', fontSize: '0.95rem' }}>Disponibles: <strong>{available}</strong></p>
+            <div key={product.id} className={`product-card ${isOutOfStock ? 'card-out-of-stock' : ''}`}>
+              <div className="product-card-header">
+                <h3 className="product-name">{product.name}</h3>
+                {isOutOfStock && <span className="badge-agotado">Agotado</span>}
+              </div>
+
+              {/* Información de inventario */}
+              <div className="product-info">
+                <p>Inventario Inicial: <strong>{initial}</strong></p>
+                <p className={`stock-available ${isOutOfStock ? 'text-danger' : 'text-success'}`}>
+                  Disponibles: <strong>{available}</strong>
+                </p>
+              </div>
               
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              {/* Controles de entrada de cantidad y botón de reserva */}
+              <div className="product-action-container">
                 <input 
                   type="number" 
                   min="1" 
+                  max={available}
                   placeholder="Cant."
                   value={quantities[product.id] || ''}
                   onChange={(e) => handleInputChange(product.id, e.target.value)}
-                  style={{ width: '70px', padding: '6px', borderRadius: '4px', border: '1px solid #ccc' }}
+                  disabled={isOutOfStock}
+                  className="product-input-qty"
                 />
+                {/* Botón de reserva que se desactiva si no hay stock disponible */}
                 <button 
                   onClick={() => handleAction(product.id)}
-                  style={{ background: '#3498db', color: 'white', border: 'none', padding: '7px 14px', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold', flex: 1 }}
+                  disabled={isOutOfStock}
+                  className={`product-reserve-btn ${isOutOfStock ? 'btn-disabled' : ''}`}
                 >
-                  Reservar
+                  {isOutOfStock ? 'Sin Stock' : 'Reservar'}
                 </button>
               </div>
             </div>

@@ -60,8 +60,8 @@ class ReservationController {
         quantity: parsedQuantity, 
         idempotencyKey
       });
-
       res.status(201).json(result);
+      // Nota: El servicio maneja internamente la lógica de idempotencia y control de stock
     } catch (error) {
       if (error.message === 'INSUFFICIENT_STOCK') {
         return res.status(400).json({ error: 'No existe inventario suficiente para la reserva.' });

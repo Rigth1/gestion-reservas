@@ -1,5 +1,5 @@
 const swaggerJSDoc = require('swagger-jsdoc');
-
+// Configuración de Swagger para la documentación de la API
 const options = {
   definition: {
     openapi: '3.0.0',
@@ -8,6 +8,7 @@ const options = {
       version: '1.0.0',
       description: 'Documentación de la API para gestión de productos, reservas con control de concurrencia e idempotencia, y autenticación segura con JWT.',
     },
+    // Definición del servidor de desarrollo y seguridad con JWT
     servers: [
       {
         url: 'http://localhost:5000',

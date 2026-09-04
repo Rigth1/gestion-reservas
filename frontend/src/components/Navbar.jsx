@@ -1,26 +1,32 @@
 import React from 'react';
+import '../css/Navbar.css'; // Importación de estilos independientes
 
+/**
+ * Componente Navbar
+ * Encabezado principal de la aplicación que muestra el título del MVP,
+ * el estado actual de la sesión del usuario y la opción de cerrar sesión.
+ */
 export default function Navbar({ isAuthenticated, onLogout }) {
   return (
-    <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #eaeaea', paddingBottom: '1rem', marginBottom: '2rem' }}>
-      <div>
-        <h1 style={{ color: '#2c3e50', margin: 0, fontSize: '1.8rem' }}>Gestión de Reservas e Inventario</h1>
-        <p style={{ color: '#7f8c8d', margin: '5px 0 0 0' }}>Panel de Control MVP - Full Stack</p>
+    <header className="navbar-header">
+      {/* Título e información general del panel */}
+      <div className="navbar-titles">
+        <h1 className="navbar-title">Gestión de Reservas e Inventario</h1>
+        <p className="navbar-subtitle">Panel de Control MVP - Full Stack</p>
       </div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-        <span style={{ 
-          padding: '4px 10px', 
-          borderRadius: '4px', 
-          fontSize: '0.85rem', 
-          backgroundColor: isAuthenticated ? '#d4edda' : '#f8d7da', 
-          color: isAuthenticated ? '#155724' : '#721c24' 
-        }}>
+
+      {/* Acciones de usuario y estado de autenticación */}
+      <div className="navbar-actions">
+        <span className={`navbar-status-badge ${isAuthenticated ? 'status-active' : 'status-inactive'}`}>
           {isAuthenticated ? '● Autenticado' : '○ Sin sesión'}
         </span>
+
+        {/* Muestra el botón de cerrar sesión únicamente si el usuario está autenticado */}
         {isAuthenticated && (
           <button 
             onClick={onLogout}
-            style={{ background: '#e74c3c', color: 'white', border: 'none', padding: '6px 12px', borderRadius: '4px', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 'bold' }}
+            className="navbar-logout-btn"
+            title="Finalizar sesión actual"
           >
             Cerrar Sesión
           </button>

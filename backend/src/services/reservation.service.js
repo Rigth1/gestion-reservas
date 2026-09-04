@@ -125,8 +125,9 @@ class ReservationService {
         'UPDATE products SET available_stock = available_stock + $1 WHERE id = $2',
         [reservation.quantity, reservation.product_id]
       );
-
+      // Commit de la transacción si todo fue exitoso
       await client.query('COMMIT');
+      // Log de auditoría para seguimiento de cancelaciones y restauración de stock
       logger.info('RESERVATION_CANCELLED', { reservationId, userId, restoredStock: reservation.quantity, productId: reservation.product_id });
       return { message: 'Reserva cancelada exitosamente y stock devuelto.' };
     } catch (error) {
