@@ -17,6 +17,12 @@ Para levantar toda la solución (Base de datos PostgreSQL y Backend) de manera a
 ```bash
    docker-compose up --build -d 
 ```
+3. En caso de ser necesario reajustar el Stock sin ingresar a base de datos se puede bajar el servicio, eliminando las instancias y
+   volviendo a ejecutar el comando anterior para volver a comenzar desde cero
+```bash
+   docker-compose down -v
+   docker-compose up --build -d
+```
 
 # Verifica que los servicios estén corriendo correctamente
 
@@ -46,6 +52,7 @@ password: 123
 
 Para validar las reglas de negocio críticas (control de stock, transacciones concurrentes y manejo de idempotencia):
 
+Importante: Hacer el test con stock disponible (despues de iniciar contenedor) o fallara la creacion y marcara como error 1 por falta de stock
 1. Ingresa al contenedor del backend o ejecuta las pruebas mediante npm:
 ``` bash
     cd backend

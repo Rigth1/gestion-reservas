@@ -92,7 +92,7 @@ describe('Pruebas Automatizadas de Reglas de Negocio - Backend', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ productId: 1, quantity: 1 });
 
-    const reservationId = createRes.body.reservation.id;
+    const reservationId = createRes.body.id || createRes.body.reservation?.id;
 
     // 2. Primera cancelación
     const firstCancel = await request(app)
