@@ -1,6 +1,9 @@
+# Docker compose principal para levantar la base de datos, backend y frontend
 services:
+# Base de datos PostgreSQL
   db:
     image: postgres:15-alpine
+    container_name: postgres_db
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: PruebaTPass123
@@ -9,18 +12,36 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      # Inicialización de la base de datos con un script SQL
       - ./backend/database/init.sql:/docker-entrypoint-initdb.d/init.sql
-
+    restart: always
+# backend
   backend:
     build: ./backend
+    container_name: backend_app
     ports:
       - "5000:5000"
+      # Variables de entorno para la conexión a la base de datos y JWT
     environment:
       - PORT=5000
       - DATABASE_URL=postgres://postgres:PruebaTPass123@db:5432/inventory_db
       - JWT_SECRET= PROyecTO-GTI-1423
     depends_on:
       - db
+    restart: always
+# frontend
+  frontend:
+    build: 
+    # Definimos el contexto de construcción y pasamos la variable de entorno para la URL del backend
+      context: ./frontend
+      args:
+        - VITE_API_URL=http://localhost:5000/api
+    container_name: frontend_app
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: always
 
 volumes:
   postgres_data:

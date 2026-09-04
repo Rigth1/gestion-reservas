@@ -1,0 +1,18 @@
+# Etapa 1: Construcción (Build)
+FROM node:20-alpine AS builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+# Argumento para recibir la URL de la API en tiempo de compilación de Docker
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+RUN npm run build
+
+# Etapa 2: Servidor Web (Nginx)
+FROM nginx:alpine
+COPY --from=builder /app/dist /usr/share/nginx/html
+# Copiamos configuración personalizada de Nginx para SPA
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80
+CMD ["nginx", "-g", "daemon off;"]
