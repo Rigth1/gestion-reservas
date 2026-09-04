@@ -13,7 +13,8 @@ class ReservationController {
   // obtener todas las reservas con toda la informacion de los productos
   async getReservations(req, res, next) {
     try {
-      const reservations = await reservationService.getReservations();
+      const userId = req.user.userId;
+      const reservations = await reservationService.getReservations(userId);
       res.json(reservations);
     } catch (error) {
       next(error);

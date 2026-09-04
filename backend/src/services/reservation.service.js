@@ -1,36 +1,40 @@
 const pool = require('../config/db');
 const logger = require('../utils/logger');
 
-// Service para manejar la lógica de reservas
+// Service para manejar la lógica de reservas e inventario de forma transaccional y segura
 class ReservationService {
-    // Obtener todos los productos
+  
+  // Obtener todos los productos disponibles
   async getProducts() {
     const result = await pool.query('SELECT * FROM products ORDER BY id ASC');
     return result.rows;
   }
-  // Obtener todas las reservas con información del producto
-  async getReservations() {
+
+  // Obtener todas las reservas con información detallada del producto y usuario asociado
+  async getReservations(user_id) {
     const result = await pool.query(`
-      r.id, r.quantity, r.status, r.created_at, p.name as product_name
+      SELECT r.id, r.quantity, r.status, r.created_at, p.name as product_name, r.user_id
       FROM reservations r
       JOIN products p ON r.product_id = p.id
+      WHERE r.user_id = $1
       ORDER BY r.created_at DESC
-    `);
+    `, [user_id]);
     return result.rows;
   }
-  // Crear una nueva reserva con manejo de idempotencia y control de stock
-  async createReservation(productId, quantity, idempotencyKey) {
+
+  // Crear una nueva reserva con manejo de idempotencia, transacciones y control estricto de stock por usuario
+  async createReservation(productId, quantity, idempotencyKey, userId) {
     const client = await pool.connect();
     try {
+      // Iniciar transacción para asegurar atomicidad y consistencia
       await client.query('BEGIN');
 
-      // 1. Validar idempotencia si se provee la llave
+      // 1. Validar idempotencia si se provee la llave para evitar duplicados por reintentos de red
       if (idempotencyKey) {
         const existingRes = await client.query(
           'SELECT * FROM reservations WHERE idempotency_key = $1',
           [idempotencyKey]
         );
-        // Si ya existe una reserva con la misma llave, retornar la reserva existente
         if (existingRes.rows.length > 0) {
           await client.query('COMMIT');
           logger.info('RESERVATION_IDEMPOTENT_HIT', { idempotencyKey, reservationId: existingRes.rows[0].id });
@@ -38,43 +42,45 @@ class ReservationService {
         }
       }
 
-      // 2. Bloquear y consultar producto con FOR UPDATE para prevenir race conditions
+      // 2. Bloquear y consultar producto con FOR UPDATE para prevenir race conditions ante solicitudes simultáneas
       const productRes = await client.query(
         'SELECT * FROM products WHERE id = $1 FOR UPDATE',
         [productId]
       );
 
       if (productRes.rows.length === 0) {
-        logger.error('RESERVATION_REJECTED', new Error('PRODUCT_NOT_FOUND'), { productId, quantity, idempotencyKey });
+        logger.error('RESERVATION_REJECTED', new Error('PRODUCT_NOT_FOUND'), { productId, quantity, userId });
         throw new Error('PRODUCT_NOT_FOUND');
       }
 
       const product = productRes.rows[0];
 
-      // 3. Validar inventario suficiente
+      // 3. Validar inventario suficiente (nunca permitir valores negativos)
       if (product.available_stock < quantity) {
-        logger.error('RESERVATION_REJECTED', new Error('INSUFFICIENT_STOCK'), { productId, quantity, idempotencyKey });
+        logger.error('RESERVATION_REJECTED', new Error('INSUFFICIENT_STOCK'), { productId, quantity, available: product.available_stock, userId });
         throw new Error('INSUFFICIENT_STOCK');
       }
 
-      // 4. Descontar stock
+      // 4. Descontar stock de forma segura
       const newAvailable = product.available_stock - quantity;
       await client.query(
         'UPDATE products SET available_stock = $1 WHERE id = $2',
         [newAvailable, productId]
       );
 
-      // 5. Crear la reserva
+      // 5. Crear la reserva asociada al usuario autenticado
       const insertRes = await client.query(
-        `INSERT INTO reservations (product_id, quantity, status, idempotency_key) 
-         VALUES ($1, $2, 'ACTIVE', $3) RETURNING *`,
-        [productId, quantity, idempotencyKey]
+        `INSERT INTO reservations (user_id, product_id, quantity, status, idempotency_key) 
+         VALUES ($1, $2, $3, 'ACTIVE', $4) RETURNING *`,
+        [userId, productId, quantity, idempotencyKey]
       );
-    // commit de la transaccion si todo fue exitosos y en caso de error hacer rollback para mantener la consistencia de la base de datos
+
+      // Commit de la transacción si todo fue exitoso
       await client.query('COMMIT');
-      logger.info('RESERVATION_ACCEPTED', { reservationId: insertRes.rows[0].id, productId, quantity, idempotencyKey });
+      logger.info('RESERVATION_ACCEPTED', { reservationId: insertRes.rows[0].id, userId, productId, quantity });
       return { reservation: insertRes.rows[0], idempotentHit: false };
     } catch (error) {
+      // Rollback en caso de error para mantener la consistencia de la base de datos
       await client.query('ROLLBACK');
       throw error;
     } finally {
@@ -82,21 +88,20 @@ class ReservationService {
     }
   }
 
-  // Cancelar una reserva y devolver stock al inventario con manejo de idempotencia
-  async cancelReservation(reservationId) {
+  // Cancelar una reserva activa y devolver el stock al inventario
+  async cancelReservation(reservationId, userId) {
     const client = await pool.connect();
     try {
-    // iniciar transaccion para asegurar que todas las operaciones se realicen de manera atomica y consistente
       await client.query('BEGIN');
 
-      // Buscar reserva con bloqueo
+      // Buscar reserva con bloqueo para evitar condiciones de carrera concurrentes
       const resQuery = await client.query(
         'SELECT * FROM reservations WHERE id = $1 FOR UPDATE',
         [reservationId]
       );
 
       if (resQuery.rows.length === 0) {
-        logger.error('CANCELLATION_FAILED', new Error('RESERVATION_NOT_FOUND'), { reservationId });
+        logger.error('CANCELLATION_FAILED', new Error('RESERVATION_NOT_FOUND'), { reservationId, userId });
         throw new Error('RESERVATION_NOT_FOUND');
       }
 
@@ -105,7 +110,7 @@ class ReservationService {
       // Si ya está cancelada, mantener estado consistente sin re-sumar stock (idempotencia en cancelación)
       if (reservation.status === 'CANCELLED') {
         await client.query('COMMIT');
-        logger.info('CANCELLATION_ALREADY_PROCESSED', { reservationId });
+        logger.info('CANCELLATION_ALREADY_PROCESSED', { reservationId, userId });
         return { message: 'La reserva ya se encontraba cancelada.', reservation };
       }
 
@@ -120,9 +125,9 @@ class ReservationService {
         'UPDATE products SET available_stock = available_stock + $1 WHERE id = $2',
         [reservation.quantity, reservation.product_id]
       );
-      // commit de la transaccion si todo fue exitosos y en caso de error hacer rollback para mantener la consistencia de la base de datos
+
       await client.query('COMMIT');
-      logger.info('RESERVATION_CANCELLED', { reservationId, restoredStock: reservation.quantity, productId: reservation.product_id });
+      logger.info('RESERVATION_CANCELLED', { reservationId, userId, restoredStock: reservation.quantity, productId: reservation.product_id });
       return { message: 'Reserva cancelada exitosamente y stock devuelto.' };
     } catch (error) {
       await client.query('ROLLBACK');
