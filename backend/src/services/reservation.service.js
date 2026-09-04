@@ -23,7 +23,7 @@ class ReservationService {
   }
 
   // Crear una nueva reserva con manejo de idempotencia, transacciones y control estricto de stock por usuario
-  async createReservation(productId, quantity, idempotencyKey, userId) {
+  async createReservation({ product_id, quantity, idempotencyKey, userId }) {
     const client = await pool.connect();
     try {
       // Iniciar transacción para asegurar atomicidad y consistencia
@@ -45,11 +45,11 @@ class ReservationService {
       // 2. Bloquear y consultar producto con FOR UPDATE para prevenir race conditions ante solicitudes simultáneas
       const productRes = await client.query(
         'SELECT * FROM products WHERE id = $1 FOR UPDATE',
-        [productId]
+        [product_id]
       );
 
       if (productRes.rows.length === 0) {
-        logger.error('RESERVATION_REJECTED', new Error('PRODUCT_NOT_FOUND'), { productId, quantity, userId });
+        logger.error('RESERVATION_REJECTED', new Error('PRODUCT_NOT_FOUND'), { productId: product_id, quantity, userId });
         throw new Error('PRODUCT_NOT_FOUND');
       }
 
@@ -57,7 +57,7 @@ class ReservationService {
 
       // 3. Validar inventario suficiente (nunca permitir valores negativos)
       if (product.available_stock < quantity) {
-        logger.error('RESERVATION_REJECTED', new Error('INSUFFICIENT_STOCK'), { productId, quantity, available: product.available_stock, userId });
+        logger.error('RESERVATION_REJECTED', new Error('INSUFFICIENT_STOCK'), { productId: product_id, quantity, available: product.available_stock, userId });
         throw new Error('INSUFFICIENT_STOCK');
       }
 
@@ -65,19 +65,19 @@ class ReservationService {
       const newAvailable = product.available_stock - quantity;
       await client.query(
         'UPDATE products SET available_stock = $1 WHERE id = $2',
-        [newAvailable, productId]
+        [newAvailable, product_id]
       );
 
       // 5. Crear la reserva asociada al usuario autenticado
       const insertRes = await client.query(
         `INSERT INTO reservations (user_id, product_id, quantity, status, idempotency_key) 
          VALUES ($1, $2, $3, 'ACTIVE', $4) RETURNING *`,
-        [userId, productId, quantity, idempotencyKey]
+        [userId, product_id, quantity, idempotencyKey]
       );
 
       // Commit de la transacción si todo fue exitoso
       await client.query('COMMIT');
-      logger.info('RESERVATION_ACCEPTED', { reservationId: insertRes.rows[0].id, userId, productId, quantity });
+      logger.info('RESERVATION_ACCEPTED', { reservationId: insertRes.rows[0].id, userId, productId: product_id, quantity });
       return { reservation: insertRes.rows[0], idempotentHit: false };
     } catch (error) {
       // Rollback en caso de error para mantener la consistencia de la base de datos

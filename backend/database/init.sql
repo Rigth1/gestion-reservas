@@ -9,9 +9,9 @@ CREATE TABLE IF NOT EXISTS users (
 -- Insertar un usuario de prueba inicial (password: 123456)
 -- Para producción usaríamos bcrypt, para el MVP con texto plano o hash básico es suficiente
 INSERT INTO users (username, password) VALUES 
-('cliente_prueba', '$2b$10$8Q6Ff.FwJtVd9yP3W2vF5xQ6L7rYm8sZ7T9m6KIXV8tq4l5YyW7gq8'),
-('cliente_prueba2', '$2b$10$9vK3cR1z8yZ6Bw4vT5kY4J7qW9N2p0jL6X7vH7E1L5u2V12345678'),
-('admin', '$2b$10$5p0jL6X7vH7E1L5u2V123456789uK3cR1z8yZ6Bw4vT5kY4J7qW9N2')
+('cliente_prueba', '$2b$10$/IBa6vsjrcnpIeaqrT7/zOspkhWLwWS/bYCIygw099Vpgo7ltbUyW'),
+('cliente_prueba2', '$2b$10$ixHYOeNGqeqYyy1wMQ8iAOMoIWb6qEvGg2QdU0XECU4f8f6hjafvu'),
+('admin', '$2b$10$Suan1cs8tcUcjDkLbH6i1uWs83TyVTqUjwqiFWgRf1sTnlyzu.pJG')
 ON CONFLICT (username) DO NOTHING;
 
 CREATE TABLE IF NOT EXISTS products (
@@ -32,8 +32,8 @@ CREATE TABLE IF NOT EXISTS reservations (
 );
 
 -- Datos de prueba iniciales de productos
-INSERT INTO products (name, initial_stock, available_stock) VALUES
-('Consola portátil', 5, 5),
-('Audífonos inalámbricos', 10, 10),
-('Teclado mecánico', 8, 8)
+INSERT INTO products (id, name, initial_stock, available_stock) VALUES
+(1, 'Consola portátil', 5, 5),
+(2, 'Audífonos inalámbricos', 10, 10),
+(3, 'Teclado mecánico', 8, 8)
 ON CONFLICT DO NOTHING;

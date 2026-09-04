@@ -105,9 +105,6 @@ router.post('/reservations', verifyToken, (req, res, next) => {
  *       404:
  *         description: Reserva no encontrada
  */
-router.post('/reservations/:id/cancel', verifyToken, (req, res, next) => {
-  req.body.userId = req.user.userId;
-  reservationController.cancel(req, res, next);
-});
+router.post('/reservations/:id/cancel', verifyToken, reservationController.cancel);
 
 module.exports = router;

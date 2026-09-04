@@ -32,6 +32,16 @@ Health Check: http://localhost:5000/health
 
 Documentación de la API (Swagger): http://localhost:5000/api-docs
 
+Usuarios de prueba:
+username: admin
+password: admin123 
+
+username: cliente_prueba
+password: 321 
+
+username: cliente_prueba2
+password: 123
+
 # 🧪 Ejecución de Pruebas Automatizadas
 
 Para validar las reglas de negocio críticas (control de stock, transacciones concurrentes y manejo de idempotencia):
