@@ -87,8 +87,25 @@ Alternativa seleccionada: Contenedorización monolítica/orquestada mediante Doc
 Trade-offs / Riesgos: Un entorno dockerizado simplifica drásticamente la ejecución local, cumpliendo con la exigencia de que no sea necesario configurar bases de datos manualmente.
 
 # 🧩 Resolución de Ambigüedad de Negocio
-Se decidió permitir múltiples reservas independientes por simplicidad transaccional y mayor trazabilidad del inventario, permitiendo que se pudieran hacer múltiples reservas de un mismo ítem, asociándolo a un usuario para tener trazabilidad y gestión de cancelaciones.
-Cada reserva opera de forma autónoma con su propio ciclo de vida y cancelación independiente.
+### 1. Independencia y Ciclo de Vida de las Reservas
+* **Situación identificada:** El requerimiento funcional indicaba que un cliente puede reservar varias veces el mismo producto, pero no especificaba si múltiples reservas independientes debían consolidarse en una sola o permanecer separadas.
+* **Decisión tomada:** Se decidió permitir **reservas independientes**. Cada solicitud genera un registro autónomo con su propio identificador y ciclo de vida.
+* **Consecuencias:** Facilita la trazabilidad individual y simplifica la lógica transaccional de cancelación, permitiendo que el usuario devuelva unidades específicas sin afectar otras reservas del mismo producto.
+
+### 2. Pertenencia y Trazabilidad por Usuario
+* **Situación identificada:** El enunciado original mencionaba que "un cliente" realiza reservas y las consulta, pero no detallaba cómo el backend debía asociar y filtrar los registros para garantizar que un usuario solo gestione sus propias reservas.
+* **Decisión tomada:** Se incorporó una relación explícita mediante una clave foránea (`user_id`) en la tabla de reservas de la base de datos, vinculando cada operación al usuario autenticado vía JWT.
+* **Consecuencias:** Garantiza un aislamiento adecuado de los datos a nivel de sesión y simplifica el endpoint de consulta (`GET /reservations`), permitiendo filtrar o auditar de forma precisa qué cliente posee cada reserva activa.
+
+### 3. Mecanismo de Deduplicación por Red (Idempotencia)
+* **Situación identificada:** El cliente podía reenviar solicitudes por problemas de conectividad, pero no se especificaba cómo identificar de forma unívoca la operación lógica.
+* **Decisión tomada:** Se adoptó el uso de la cabecera `idempotency-key`. Si el cliente reintenta con la misma llave, el sistema no duplica la reserva ni descuenta stock de nuevo.
+* **Consecuencias:** Mayor resiliencia ante fallos de red del cliente sin comprometer la integridad del inventario.
+
+### 4. Consistencia ante Cancelaciones Concurrente o Repetidas
+* **Situación identificada:** Una reserva cancelada podía recibir múltiples peticiones de anulación posteriores.
+* **Decisión tomada:** Se validó el estado actual de la reserva dentro de una transacción; si ya está inactiva, se bloquea la reejecución de devolución de stock.
+* **Consecuencias:** Se evita inflar artificialmente el inventario disponible por reintentos duplicados de cancelación.
 
 # 🤖 Registro de Uso de Inteligencia Artificial
 Herramienta: Gemini (Google)
